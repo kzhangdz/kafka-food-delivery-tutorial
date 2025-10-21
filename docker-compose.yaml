@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  # config documentation
+  # https://docs.confluent.io/platform/current/installation/docker/config-reference.html
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+
+    environment:
+      # use the native KRaft, no external dependency on ZooKeeper needed
+      # to manage metadata and clusters
+      KAFKA_KRAFT_MODE: "true"
+
+      # declare one cluster, which will have one node/broker
+      # that node will be our controller
+
+      # random arbitrary id
+      # can generate using this tool /bin/kafka-storage random-uuid
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      # integer id for our one broker
+      KAFKA_NODE_ID: 1
+
+      # declares the node as both a broker and controller
+      # as a broker, it moves events from producers to consumers
+      # as a controller, it's the lead broker that also manage metadata and administrative tasks
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # defines which brokers are controllers, can vote on important cluster decisions
+      # only one active controllers, but can declare multiple as backup controllers
+      # format: id@kafka:port,id2@kafka:port
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # VERY IMPORTANT, REQUIRED
+      # copies of Kafka metadata, which keeps track of the messages each consumer has read
+      # 1 means we have no backup
+      # default is 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Specify network interfaces and ports for the broker to listen to incoming connections from clients and other brokers
+      # Regular data traffic on port 9092, where normal producers and consumers connect
+      # Node/broker to node/broker communication, specifically with the controller
+      # One door for clients, one for controllers
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+
+      # The address that Kafka tells clients/brokers to connect to
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # The address that Kafka tells controllers to connect to
+      # CONTROLLER shortcuts the url 0.0.0.0:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Where to store logs like data files, broker logs, controller metadata
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+    volumes:
+      # link local folder declared in kafka_kraft to container's /var/lib/kafka/data
+      - kafka_kraft:/var/lib/kafka/data
+
+volumes:
+  # This is named volumes, not a bind mount
+  # Means that Docker determines the file path on the host system
+  # Run `docker volume inspect db-data` and look at the Mountpoint for the host path
+  kafka_kraft:
