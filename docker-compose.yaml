@@ -1,5 +1,7 @@
 version: "3.9"
 
+# based on https://www.youtube.com/watch?v=B7CwU_tNYIE
+
 services:
   # config documentation
   # https://docs.confluent.io/platform/current/installation/docker/config-reference.html
@@ -43,10 +45,32 @@ services:
       # Regular data traffic on port 9092, where normal producers and consumers connect
       # Node/broker to node/broker communication, specifically with the controller
       # One door for clients, one for controllers
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
 
-      # The address that Kafka tells clients/brokers to connect to
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # # The address that Kafka tells clients/brokers to connect to
+      # KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+
+      # KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+
+      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      # KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+
+      # Define both internal and external listeners
+      # The host machine would connect to port 9092
+      # Things that need to connect to Kafka from inside the container, like my python script, would use port 29092
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+
+      # Tell clients how to connect to each listener
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+
+      # Configure how listeners are mapped to security protocols
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      # Tell brokers how to connect to each other (via the internal listener)
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
 
       # The address that Kafka tells controllers to connect to
       # CONTROLLER shortcuts the url 0.0.0.0:9093
@@ -58,6 +82,33 @@ services:
     volumes:
       # link local folder declared in kafka_kraft to container's /var/lib/kafka/data
       - kafka_kraft:/var/lib/kafka/data
+
+  # declare the python app as a service to run alongside the kafka service
+  # wouldn't need this if we were doing one-off runs with docker run image-name
+  my_python_app:
+    build: ./lib # Points to the directory with your Dockerfile
+    container_name: my_python_app
+    depends_on:
+      - kafka
+    environment:
+      # - KAFKA_BROKER=kafka:9092
+      - KAFKA_BROKER=kafka:29092 # Note the change to port 29092 for internal access
+      # - KAFKA_BROKER=kafka:29092
+
+    volumes:
+      - ./lib:/usr/src/app
+
+  # New service for the Kafka consumer
+  my_python_consumer:
+    build: ./lib # Reuses the same build context and Dockerfile
+    container_name: my_python_consumer
+    depends_on:
+      - kafka # Ensures Kafka starts before the consumer
+    environment:
+      - KAFKA_BROKER=kafka:29092
+    volumes:
+      - ./lib:/usr/src/app
+    command: python tracker.py # Overrides the default command to run your consumer script
 
 volumes:
   # This is named volumes, not a bind mount

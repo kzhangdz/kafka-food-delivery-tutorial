@@ -1,0 +1,13 @@
+# docker exec to run commands inside a container
+# -i and -t for interactive and pseudo-TTY (pseudoterminal)
+# kafka-topics to create, delete, or list topics in a cluster
+docker exec -it <container-name> kafka-topics --list --bootstrap-server <kafka host:port>
+docker exec -it kafka kafka-topics --list --bootstrap-server kafka:29092
+
+# --describe lists configuration properties and values for topic
+docker exec -it <container-name> kafka-topics --describe --topic <topic-name> --bootstrap-server <kafka host:port> 
+docker exec -it kafka kafka-topics --describe --topic orders --bootstrap-server kafka:29092
+
+# kafka-console-consumer consumes records from a topic
+docker exec -it <container-name> kafka-console-consumer --bootstrap-server <kafka host:port> --topic <topic-name> --from-beginning
+docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic orders --from-beginning
