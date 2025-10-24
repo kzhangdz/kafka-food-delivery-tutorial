@@ -89,7 +89,7 @@ services:
     build: ./lib # Points to the directory with your Dockerfile
     container_name: my_python_app
     depends_on:
-      - kafka
+      - kafka # Ensures Kafka starts before the consumer
     environment:
       # - KAFKA_BROKER=kafka:9092
       - KAFKA_BROKER=kafka:29092 # Note the change to port 29092 for internal access
@@ -98,17 +98,17 @@ services:
     volumes:
       - ./lib:/usr/src/app
 
-  # New service for the Kafka consumer
+  # initialize the consumer as a separate service, so it can run independently from the producer
   my_python_consumer:
     build: ./lib # Reuses the same build context and Dockerfile
     container_name: my_python_consumer
     depends_on:
-      - kafka # Ensures Kafka starts before the consumer
+      - kafka 
     environment:
       - KAFKA_BROKER=kafka:29092
     volumes:
       - ./lib:/usr/src/app
-    command: python tracker.py # Overrides the default command to run your consumer script
+    command: python tracker.py # Overrides the default command to run the consumer script
 
 volumes:
   # This is named volumes, not a bind mount
